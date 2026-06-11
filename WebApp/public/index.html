@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Capituva Monitor</title>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+      background: #f3f3f3;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th,
+    td {
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+
+    tr:hover {
+      background: #f1f1f1;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      margin: 20px auto;
+      max-width: 900px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+  </style>
+
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+
+</head>
+
+<body>
+  <h1>Capituva Monitor</h1>
+  <div class="card">
+    <label id="ultima"> Última leitura: --</label>
+  </div>
+  <div class="card">
+    <h3>Histórico</h3>
+    <div style="text-align:right; margin-bottom:10px;">
+      <button id="btReset">🔄 Resetar gráfico</button>
+    </div>
+    <canvas id="grafico" style="max-width: 700px;"></canvas>
+  </div>
+
+  <div class="card">
+    <h3>Tabela de leituras</h3>
+    <table id="tabela">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Volume (l)</th>
+          <th>Temperatura (C)</th>
+          <th>Umidade (%)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAlRIiLVigM39ELJ8bXJUIrcIzrviCAHFg",
+      authDomain: "automacaositiommcapituva.firebaseapp.com",
+      databaseURL: "https://automacaositiommcapituva-default-rtdb.firebaseio.com/",
+      projectId: "automacaositiommcapituva",
+      storageBucket: "automacaositiommcapituva.appspot.com",
+      messagingSenderId: "00000000000",
+      appId: "1:00000000000:web:xxxxxxxxxxxxxxxx"
+    };
+
+    // Inicializa Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Caminho correto no banco de dados
+    const historicoRef = ref(db, "capituva_monitor/historico");
+
+    const tabelaBody = document.querySelector("#tabela tbody");
+    let grafico = null;
+
+    onValue(historicoRef, (snapshot) => {
+      const dados = snapshot.val();
+      tabelaBody.innerHTML = "";
+
+      const labels = [];
+      const valores = [];
+      const temperaturas = [];
+      const umidades = [];
+      var lastkey = 0;
+      for (const key in dados) {
+        const item = dados[key];
+        lastkey = key;
+        labels.push(new Date(item.timestamp));
+        valores.push(item.volume);
+        temperaturas.push(item.tempInterna);
+        umidades.push(item.umidadeInterna);
+        tabelaBody.innerHTML += `
+          <tr>
+            <td>${item.timestamp}</td>
+            <td>${item.volume}</td>
+	          <td>${item.tempInterna}</td>
+            <td>${item.umidadeInterna}</td>
+          </tr>
+        `;
+      }
+      const ultimaLabel = document.getElementById("ultima");
+      const item = dados[lastkey];
+
+      ultimaLabel.textContent =
+        "Última leitura: " + item.timestamp + " - " + item.volume + " l - " + item.tempInterna + " C - " + item.umidadeInterna + " %";
+      // if (grafico) grafico.resetZoom();
+
+      grafico = new Chart(document.getElementById("grafico"), {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Volume (l)",
+              data: valores,
+              borderWidth: 2,
+
+            },
+            {
+              label: "Temperatura (°C)",
+              data: temperaturas,
+              borderWidth: 1,
+
+            },
+            {
+              label: "Umidade (%)",
+              data: umidades,
+              borderWidth: 1,
+
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            mode: 'nearest',
+            intersect: false
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: {
+                tooltipFormat: 'dd/MM/yyyy HH:mm',
+                displayFormats: {
+                  minute: 'dd/MM HH:mm',
+                  hour: 'dd/MM HH:mm',
+                  day: 'dd/MM'
+                }
+              },
+              title: {
+                display: true,
+                text: 'Tempo'
+              }
+            },
+            y: {
+              type: 'linear',
+              position: 'left',
+              title: { display: true, text: 'Volume (l)/Temperatura (°C)/Umidade (%)' }
+            }
+
+          },
+          plugins: {
+            zoom: {
+              // 🔹 PAN (arrastar) → somente com CTRL
+              pan: {
+                enabled: true,
+                mode: 'xy',
+                modifierKey: 'ctrl' // ← SEGURA CTRL para arrastar
+              },
+
+              // 🔹 ZOOM → sem CTRL
+              zoom: {
+                wheel: {
+                  enabled: true,
+                  modifierKey: null // ← scroll SEM CTRL faz zoom
+                },
+                drag: {
+                  enabled: true,
+                  modifierKey: null // ← selecionar área SEM CTRL faz zoom
+                },
+                pinch: {
+                  enabled: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+    });
+    const botao = document.getElementById("btReset");
+    botao.addEventListener("click", function () {
+      if (grafico) {
+        grafico.resetZoom();
+      }
+    });
+  </script>
+</body>
+
+</html>
