@@ -10,6 +10,8 @@
   - Bibliotecas necessárias:
       LinkedList (Ivan Seidel)
       DHT sensor library (Adafruit)
+      WIFIManager (tzapu)
+      ArduinoJson (Benoit)
 */
 
 #include <ESP8266WiFi.h>
